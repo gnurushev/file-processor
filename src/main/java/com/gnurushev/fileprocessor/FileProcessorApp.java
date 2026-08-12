@@ -2,8 +2,6 @@ package com.gnurushev.fileprocessor;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -32,6 +30,15 @@ public final class FileProcessorApp extends Application {
     private Path currentPdf;
     private Path queuedPdf;
 
+    public static void main(String[] args) throws Exception {
+        LaunchOptions launchOptions = LaunchOptions.parse(args);
+        if (launchOptions.printJobWatchConfig().isPresent()) {
+            PrintJobInboxWatcher.run(launchOptions.printJobWatchConfig().orElseThrow(), AppConfig.load());
+            return;
+        }
+        launch(args);
+    }
+
     @Override
     public void start(Stage stage) throws IOException {
         config = AppConfig.load();
@@ -41,7 +48,7 @@ public final class FileProcessorApp extends Application {
         pdfPreviewService = new PdfPreviewService(config);
         primaryStage = stage;
 
-        Optional<Path> startupPdf = extractStartupPdf(getParameters().getRaw());
+        Optional<Path> startupPdf = LaunchOptions.parse(getParameters().getRaw()).startupPdf();
         singleInstanceService = new SingleInstanceService(config.singleInstancePort());
         if (singleInstanceService.forwardToRunningInstance(startupPdf.orElse(null))) {
             Platform.exit();
@@ -73,7 +80,7 @@ public final class FileProcessorApp extends Application {
             shell.setStatus("Sign in to load PDF files and fetch patient documents.");
         } else {
             shell.requireLogin(false);
-            shell.setStatus("Ready. Open a PDF with File Processor to begin.");
+            shell.setStatus("Ready. Open a PDF with Patient Document Manager to begin.");
         }
 
         singleInstanceService.start(message -> Platform.runLater(() -> handleInstanceMessage(message)));
@@ -254,15 +261,6 @@ public final class FileProcessorApp extends Application {
         primaryStage.requestFocus();
     }
 
-    private static Optional<Path> extractStartupPdf(List<String> rawArguments) {
-        return rawArguments.stream()
-            .filter(argument -> argument.toLowerCase().endsWith(".pdf"))
-            .findFirst()
-            .map(Paths::get)
-            .map(Path::toAbsolutePath)
-            .map(Path::normalize);
-    }
-
     private static Throwable unwrap(Throwable error) {
         Throwable current = error;
         while (current instanceof CompletionException && current.getCause() != null) {
@@ -282,4 +280,3 @@ public final class FileProcessorApp extends Application {
         }
     }
 }
-

@@ -11,7 +11,7 @@ Windows-first Java 21 desktop application for handling downloaded PDF files, pro
 
 ## Current workflow
 
-1. Windows can hand a `.pdf` file to the app through an **Open with** flow.
+1. Windows can hand a `.pdf` file to **Patient Document Manager** through an **Open with** flow.
 2. The app launches or reuses the existing window.
 3. If the user is not signed in, a login overlay is shown.
 4. Once signed in, the selected PDF is loaded and previewed.
@@ -37,14 +37,42 @@ To simulate Windows handing the app a PDF:
 .\gradlew.bat packageWindowsApp
 ```
 
-That task creates a packaged app image under `build\app-image\output\FileProcessor`.
+That task creates a packaged app image under `build\app-image\output\Patient Document Manager`.
+
+To also produce the downloadable app payload used by the bootstrap installer:
+
+```powershell
+.\gradlew.bat zipWindowsAppImage prepareWindowsInstallerAssets
+```
+
+That stages the packaged app zip plus installer scripts under `build\installer`.
 
 ## Register the packaged app for PDF "Open with"
 
 After building the app image, register its launcher for the current user:
 
 ```powershell
-.\packaging\windows\register-file-processor.ps1 -LauncherPath .\build\app-image\output\FileProcessor\FileProcessor.exe
+.\packaging\windows\register-file-processor.ps1 -LauncherPath '.\build\app-image\output\Patient Document Manager\Patient Document Manager.exe'
 ```
 
-This first implementation uses mocked authentication and mocked patient-document responses so the desktop flow can be exercised before wiring a real backend.
+## Install the app and printer integration
+
+The repository now includes a bootstrap installer script that can:
+
+1. download the packaged app zip,
+2. install it under `Program Files`,
+3. register the app as **Patient Document Manager** for PDF handoff,
+4. install a Windows printer queue named **Patient Document Manager**, and
+5. start a background watcher that converts print jobs into PDFs and forwards them to the app.
+
+Example:
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File .\packaging\windows\install-patient-document-manager.ps1 `
+  -AppDownloadUrl https://example.invalid/patient-document-manager-app.zip `
+  -GhostscriptDownloadUrl https://example.invalid/gs10.05.1w64.exe
+```
+
+The printer install uses the built-in **Microsoft PS Class Driver** plus Ghostscript to turn spool files into PDFs that the app opens automatically.
+
+This implementation still uses mocked authentication and mocked patient-document responses so the desktop flow can be exercised before wiring a real backend.

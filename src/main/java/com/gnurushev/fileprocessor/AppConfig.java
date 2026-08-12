@@ -10,11 +10,10 @@ public record AppConfig(
 ) {
     public static AppConfig load() {
         return new AppConfig(
-            System.getProperty("fileprocessor.appTitle", "File Processor"),
+            System.getProperty("fileprocessor.appTitle", "Patient Document Manager"),
             Integer.getInteger("fileprocessor.singleInstancePort", 44567),
             Integer.getInteger("fileprocessor.previewDpi", 120),
             Duration.ofMillis(Long.getLong("fileprocessor.mockLatencyMs", 350L))
         );
     }
 }
-

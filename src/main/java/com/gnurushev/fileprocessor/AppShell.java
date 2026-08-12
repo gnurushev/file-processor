@@ -349,7 +349,7 @@ public final class AppShell {
 
         Label heading = new Label("Sign in to continue");
         heading.setFont(Font.font("Segoe UI", FontWeight.BOLD, 22));
-        Label copy = new Label("File Processor keeps the selected PDF queued until you sign in.");
+        Label copy = new Label("Patient Document Manager keeps the selected PDF queued until you sign in.");
         copy.setWrapText(true);
 
         usernameField.setPromptText("Username");
