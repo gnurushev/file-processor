@@ -1,0 +1,81 @@
+plugins {
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'com.gnurushev'
+version = '0.1.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'com.gnurushev.fileprocessor.FileProcessorApp'
+    applicationDefaultJvmArgs = ['-Dfile.encoding=UTF-8']
+}
+
+javafx {
+    version = '21.0.4'
+    modules = ['javafx.controls', 'javafx.graphics', 'javafx.swing']
+}
+
+dependencies {
+    implementation 'org.apache.pdfbox:pdfbox:3.0.3'
+
+    testImplementation platform('org.junit:junit-bom:5.11.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+}
+
+tasks.named('jar', Jar) {
+    manifest {
+        attributes(
+            'Main-Class': application.mainClass.get()
+        )
+    }
+}
+
+tasks.register('prepareAppImageInput', Sync) {
+    dependsOn tasks.named('jar')
+    from(tasks.named('jar'))
+    from(configurations.runtimeClasspath)
+    into(layout.buildDirectory.dir('app-image/input'))
+}
+
+tasks.register('packageWindowsApp', Exec) {
+    dependsOn tasks.named('prepareAppImageInput')
+
+    onlyIf {
+        System.getProperty('os.name').toLowerCase().contains('windows')
+    }
+
+    doFirst {
+        def javaHome = System.getProperty('java.home')
+        def destination = layout.buildDirectory.dir('app-image/output').get().asFile
+        destination.mkdirs()
+
+        commandLine(
+            "${javaHome}\\bin\\jpackage.exe",
+            '--type', 'app-image',
+            '--dest', destination.absolutePath,
+            '--input', layout.buildDirectory.dir('app-image/input').get().asFile.absolutePath,
+            '--name', 'FileProcessor',
+            '--main-jar', tasks.named('jar').get().archiveFileName.get(),
+            '--main-class', application.mainClass.get(),
+            '--app-version', project.version.toString(),
+            '--vendor', 'gnurushev',
+            '--description', 'Desktop workflow for PDF intake and patient document lookup'
+        )
+    }
+}
+

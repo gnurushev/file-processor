@@ -1,0 +1,80 @@
+.root {
+    -fx-font-family: "Segoe UI";
+    -fx-background-color: #edf2f7;
+}
+
+.app-shell {
+    -fx-background-color: linear-gradient(to bottom, #f4f8fc, #eef3f7);
+}
+
+.preview-pane {
+    -fx-background-color: transparent;
+}
+
+.preview-scroll {
+    -fx-background-color: white;
+    -fx-border-color: #c2cfdb;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.preview-placeholder {
+    -fx-text-fill: #6d7c8a;
+    -fx-font-size: 18px;
+}
+
+.status-bar {
+    -fx-background-color: #d8e5f2;
+    -fx-border-color: #c0d1df transparent transparent transparent;
+}
+
+.status-card {
+    -fx-background-color: white;
+    -fx-border-color: #c6d3df;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
+.zoom-panel {
+    -fx-background-color: #eef5fb;
+    -fx-padding: 14;
+    -fx-border-color: #c6d3df;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+}
+
+.login-overlay {
+    -fx-background-color: rgba(15, 23, 42, 0.45);
+}
+
+.login-card {
+    -fx-background-color: white;
+    -fx-background-radius: 16;
+    -fx-border-radius: 16;
+    -fx-border-color: #d4dbe3;
+}
+
+.login-message {
+    -fx-text-fill: #b42318;
+}
+
+.button {
+    -fx-background-color: #dbe8f5;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-border-color: #b7cadc;
+}
+
+.button:hover {
+    -fx-background-color: #c8dcee;
+}
+
+.list-view,
+.combo-box,
+.text-field,
+.password-field,
+.date-picker {
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+}
+
