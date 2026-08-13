@@ -2,8 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$AppDownloadUrl,
 
-    [Parameter(Mandatory = $true)]
-    [string]$GhostscriptDownloadUrl,
+    [string]$GhostscriptDownloadUrl = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10010/gs10010.exe',
 
     [string]$InstallRoot = "$env:ProgramFiles\Patient Document Manager",
 

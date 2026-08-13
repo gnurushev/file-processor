@@ -69,10 +69,9 @@ Example:
 
 ```powershell
 PowerShell -ExecutionPolicy Bypass -File .\packaging\windows\install-patient-document-manager.ps1 `
-  -AppDownloadUrl https://example.invalid/patient-document-manager-app.zip `
-  -GhostscriptDownloadUrl https://example.invalid/gs10.05.1w64.exe
+  -AppDownloadUrl https://example.invalid/patient-document-manager-app.zip
 ```
 
-The printer install uses the built-in **Microsoft PS Class Driver** plus Ghostscript to turn spool files into PDFs that the app opens automatically.
+`GhostscriptDownloadUrl` is already set to a default installer URL, so the user does not need to pass it unless they want to override it. The printer install uses the built-in **Microsoft PS Class Driver** plus Ghostscript to turn spool files into PDFs that the app opens automatically.
 
 This implementation still uses mocked authentication and mocked patient-document responses so the desktop flow can be exercised before wiring a real backend.

@@ -68,6 +68,9 @@ tasks.register('packageWindowsApp', Exec) {
     doFirst {
         def javaHome = System.getProperty('java.home')
         def destination = layout.buildDirectory.dir('app-image/output').get().asFile
+        if (destination.exists()) {
+            destination.deleteDir()
+        }
         destination.mkdirs()
 
         commandLine(
