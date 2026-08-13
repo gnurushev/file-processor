@@ -106,3 +106,16 @@ tasks.register('prepareWindowsInstallerAssets', Sync) {
 
     into(layout.buildDirectory.dir('installer'))
 }
+
+tasks.register('prepareWindowsInstallerWizard', Sync) {
+    dependsOn tasks.named('prepareWindowsInstallerAssets')
+
+    from('packaging/windows') {
+        include 'launch-installer-wizard.ps1'
+        include 'install-patient-document-manager.ps1'
+        include 'install-patient-document-manager-printer.ps1'
+        include 'register-file-processor.ps1'
+    }
+
+    into(layout.buildDirectory.dir('installer'))
+}

@@ -57,7 +57,7 @@ After building the app image, register its launcher for the current user:
 
 ## Install the app and printer integration
 
-The repository now includes a bootstrap installer script that can:
+The repository now includes a guided installer wizard and a bootstrap installer script that can:
 
 1. download the packaged app zip,
 2. install it under `Program Files`,
@@ -65,7 +65,13 @@ The repository now includes a bootstrap installer script that can:
 4. install a Windows printer queue named **Patient Document Manager**, and
 5. start a background watcher that converts print jobs into PDFs and forwards them to the app.
 
-Example:
+For the end-user experience, launch the installer wizard:
+
+```powershell
+PowerShell -ExecutionPolicy Bypass -File .\packaging\windows\launch-installer-wizard.ps1
+```
+
+The same steps can also be run directly in automation mode:
 
 ```powershell
 PowerShell -ExecutionPolicy Bypass -File .\packaging\windows\install-patient-document-manager.ps1 `
