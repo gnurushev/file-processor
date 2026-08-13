@@ -1,6 +1,6 @@
 param(
     [string]$AppDownloadUrl,
-    [string]$GhostscriptDownloadUrl = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10010/gs10010.exe',
+    [string]$GhostscriptDownloadUrl = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe',
     [string]$InstallRoot = "$env:ProgramFiles\Patient Document Manager",
     [string]$DownloadDirectory = "$env:TEMP\patient-document-manager-installer"
 )

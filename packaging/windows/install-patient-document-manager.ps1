@@ -1,7 +1,7 @@
 param(
     [string]$AppDownloadUrl,
 
-    [string]$GhostscriptDownloadUrl = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10010/gs10010.exe',
+    [string]$GhostscriptDownloadUrl = 'https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe',
 
     [string]$InstallRoot = "$env:ProgramFiles\Patient Document Manager",
 
@@ -11,6 +11,33 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+function Invoke-DownloadWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutFile,
+
+        [int]$MaxAttempts = 3
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $OutFile
+            return
+        }
+        catch {
+            if ($attempt -eq $MaxAttempts) {
+                throw "Failed to download '$Uri' after $MaxAttempts attempts. $($_.Exception.Message)"
+            }
+
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+}
 
 function Resolve-InstallerAsset {
     param(
@@ -87,13 +114,13 @@ if ($null -eq $appArchivePath) {
         throw 'No application payload was found locally and no -AppDownloadUrl was supplied. Provide a URL or place patient-document-manager-app.zip in the installer directory or build\installer.'
     }
 
-    Invoke-WebRequest -Uri $AppDownloadUrl -OutFile $appArchivePath
+    Invoke-DownloadWithRetry -Uri $AppDownloadUrl -OutFile $appArchivePath
 }
 elseif ($appArchivePath -match '://') {
     $downloadSource = $appArchivePath
     $appArchivePath = Join-Path $DownloadDirectory 'patient-document-manager-app.zip'
     New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
-    Invoke-WebRequest -Uri $downloadSource -OutFile $appArchivePath
+    Invoke-DownloadWithRetry -Uri $downloadSource -OutFile $appArchivePath
 }
 
 $ghostscriptInstallerPath = Resolve-InstallerAsset -PathOrUrl $GhostscriptDownloadUrl -Candidates @(
@@ -105,7 +132,7 @@ $ghostscriptInstallerPath = Resolve-InstallerAsset -PathOrUrl $GhostscriptDownlo
 if ($null -eq $ghostscriptInstallerPath -or $ghostscriptInstallerPath -match '^https?://') {
     $ghostscriptInstallerPath = Join-Path $DownloadDirectory 'ghostscript-installer.exe'
     New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
-    Invoke-WebRequest -Uri $GhostscriptDownloadUrl -OutFile $ghostscriptInstallerPath
+    Invoke-DownloadWithRetry -Uri $GhostscriptDownloadUrl -OutFile $ghostscriptInstallerPath
 }
 
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
