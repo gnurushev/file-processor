@@ -3,6 +3,9 @@ plugins {
     id 'org.openjfx.javafxplugin' version '0.1.0'
 }
 
+def productName = 'Patient Document Manager'
+def productSlug = 'patient-document-manager'
+
 group = 'com.gnurushev'
 version = '0.1.0'
 
@@ -18,7 +21,10 @@ java {
 
 application {
     mainClass = 'com.gnurushev.fileprocessor.FileProcessorApp'
-    applicationDefaultJvmArgs = ['-Dfile.encoding=UTF-8']
+    applicationDefaultJvmArgs = [
+        '-Dfile.encoding=UTF-8',
+        "-Dfileprocessor.appTitle=${productName}"
+    ]
 }
 
 javafx {
@@ -62,6 +68,9 @@ tasks.register('packageWindowsApp', Exec) {
     doFirst {
         def javaHome = System.getProperty('java.home')
         def destination = layout.buildDirectory.dir('app-image/output').get().asFile
+        if (destination.exists()) {
+            destination.deleteDir()
+        }
         destination.mkdirs()
 
         commandLine(
@@ -69,7 +78,7 @@ tasks.register('packageWindowsApp', Exec) {
             '--type', 'app-image',
             '--dest', destination.absolutePath,
             '--input', layout.buildDirectory.dir('app-image/input').get().asFile.absolutePath,
-            '--name', 'FileProcessor',
+            '--name', productName,
             '--main-jar', tasks.named('jar').get().archiveFileName.get(),
             '--main-class', application.mainClass.get(),
             '--app-version', project.version.toString(),
@@ -79,3 +88,34 @@ tasks.register('packageWindowsApp', Exec) {
     }
 }
 
+tasks.register('zipWindowsAppImage', Zip) {
+    dependsOn tasks.named('packageWindowsApp')
+    from(layout.buildDirectory.dir("app-image/output/${productName}"))
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    archiveFileName = "${productSlug}-app.zip"
+}
+
+tasks.register('prepareWindowsInstallerAssets', Sync) {
+    dependsOn tasks.named('zipWindowsAppImage')
+
+    from('packaging/windows') {
+        include '*.ps1'
+        include '*.properties'
+    }
+    from(tasks.named('zipWindowsAppImage').flatMap { it.archiveFile })
+
+    into(layout.buildDirectory.dir('installer'))
+}
+
+tasks.register('prepareWindowsInstallerWizard', Sync) {
+    dependsOn tasks.named('prepareWindowsInstallerAssets')
+
+    from('packaging/windows') {
+        include 'launch-installer-wizard.ps1'
+        include 'install-patient-document-manager.ps1'
+        include 'install-patient-document-manager-printer.ps1'
+        include 'register-file-processor.ps1'
+    }
+
+    into(layout.buildDirectory.dir('installer'))
+}

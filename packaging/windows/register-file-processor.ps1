@@ -1,23 +1,49 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$LauncherPath
+    [string]$LauncherPath,
+
+    [string]$ApplicationName = 'Patient Document Manager',
+
+    [string]$ProgId = 'PatientDocumentManager.Pdf'
 )
 
-$resolvedLauncher = (Resolve-Path $LauncherPath).Path
+$resolvedLauncher = if (Test-Path $LauncherPath) {
+    (Resolve-Path $LauncherPath).Path
+} else {
+    $null
+}
 
-if (-not (Test-Path $resolvedLauncher)) {
+if ($null -eq $resolvedLauncher) {
     throw "Launcher not found: $LauncherPath"
 }
 
-$progId = 'FileProcessor.Pdf'
-$applicationName = Split-Path $resolvedLauncher -Leaf
+$applicationExecutable = Split-Path $resolvedLauncher -Leaf
 $quotedCommand = "`"$resolvedLauncher`" `"%1`""
 
-& reg.exe add "HKCU\Software\Classes\$progId" /ve /d "File Processor PDF Handler" /f | Out-Null
-& reg.exe add "HKCU\Software\Classes\$progId\shell\open\command" /ve /d $quotedCommand /f | Out-Null
-& reg.exe add "HKCU\Software\Classes\.pdf\OpenWithProgids" /v $progId /t REG_NONE /f | Out-Null
-& reg.exe add "HKCU\Software\Classes\Applications\$applicationName\shell\open\command" /ve /d $quotedCommand /f | Out-Null
-& reg.exe add "HKCU\Software\Classes\Applications\$applicationName\SupportedTypes" /v ".pdf" /t REG_SZ /d "" /f | Out-Null
+$progIdKey = "HKCU:\Software\Classes\$ProgId"
+$progIdCommandKey = "$progIdKey\shell\open\command"
 
-Write-Host "Registered $applicationName as a PDF Open with option for the current user."
+New-Item -Path $progIdKey -Force | Out-Null
+Set-ItemProperty -Path $progIdKey -Name '(Default)' -Value "$ApplicationName PDF Handler" -Type String -Force
 
+New-Item -Path $progIdCommandKey -Force | Out-Null
+Set-ItemProperty -Path $progIdCommandKey -Name '(Default)' -Value $quotedCommand -Type String -Force
+
+$pdfOpenWithKey = 'HKCU:\Software\Classes\.pdf\OpenWithProgids'
+New-Item -Path $pdfOpenWithKey -Force | Out-Null
+Set-ItemProperty -Path $pdfOpenWithKey -Name $ProgId -Value '' -Type String -Force
+
+$appKey = "HKCU:\Software\Classes\Applications\$applicationExecutable"
+$appCommandKey = "$appKey\shell\open\command"
+$appSupportedTypesKey = "$appKey\SupportedTypes"
+
+New-Item -Path $appKey -Force | Out-Null
+Set-ItemProperty -Path $appKey -Name 'FriendlyAppName' -Value $ApplicationName -Type String -Force
+
+New-Item -Path $appCommandKey -Force | Out-Null
+Set-ItemProperty -Path $appCommandKey -Name '(Default)' -Value $quotedCommand -Type String -Force
+
+New-Item -Path $appSupportedTypesKey -Force | Out-Null
+Set-ItemProperty -Path $appSupportedTypesKey -Name '.pdf' -Value '' -Type String -Force
+
+Write-Host "Registered $ApplicationName as a PDF Open with option for the current user."
