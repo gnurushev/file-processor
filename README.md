@@ -80,4 +80,6 @@ PowerShell -ExecutionPolicy Bypass -File .\packaging\windows\install-patient-doc
 
 `GhostscriptDownloadUrl` is already set to a default installer URL, so the user does not need to pass it unless they want to override it. The printer install uses the built-in **Microsoft PS Class Driver** plus Ghostscript to turn spool files into PDFs that the app opens automatically.
 
+If that PostScript driver is not present, the installer now attempts to add it automatically. If Windows still has no PostScript class driver available, the wizard stops with instructions to install a Microsoft PostScript driver and rerun as Administrator.
+
 This implementation still uses mocked authentication and mocked patient-document responses so the desktop flow can be exercised before wiring a real backend.

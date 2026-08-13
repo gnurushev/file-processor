@@ -7,11 +7,64 @@ param(
 
     [string]$DownloadDirectory = "$env:TEMP\patient-document-manager-installer",
 
-    [string]$ProductName = 'Patient Document Manager'
+    [string]$ProductName = 'Patient Document Manager',
+
+    [string]$PrinterDriverName = 'Microsoft PS Class Driver'
 )
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+function Resolve-PostScriptPrinterDriver {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PreferredDriverName
+    )
+
+    $driver = Get-PrinterDriver -Name $PreferredDriverName -ErrorAction SilentlyContinue
+    if ($null -ne $driver) {
+        return $driver.Name
+    }
+
+    $addDriverError = $null
+    try {
+        Add-PrinterDriver -Name $PreferredDriverName -ErrorAction Stop | Out-Null
+    }
+    catch {
+        $addDriverError = $_.Exception.Message
+    }
+
+    $driver = Get-PrinterDriver -Name $PreferredDriverName -ErrorAction SilentlyContinue
+    if ($null -ne $driver) {
+        return $driver.Name
+    }
+
+    $fallbackDriver = Get-PrinterDriver -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*PS Class Driver*' } |
+        Sort-Object Name |
+        Select-Object -First 1
+    if ($null -ne $fallbackDriver) {
+        Write-Host "Using fallback PostScript printer driver '$($fallbackDriver.Name)'."
+        return $fallbackDriver.Name
+    }
+
+    $driverErrorDetails = if ([string]::IsNullOrWhiteSpace($addDriverError)) {
+        'Automatic driver installation did not make the driver available.'
+    }
+    else {
+        "Automatic driver installation failed: $addDriverError"
+    }
+
+    throw @"
+No PostScript printer driver is available, so the '$ProductName' virtual printer cannot be created.
+
+Expected driver: '$PreferredDriverName'
+$driverErrorDetails
+
+Install a Microsoft PostScript class driver in Windows (Print Server Properties > Drivers > Add...),
+then rerun this installer wizard as Administrator.
+"@
+}
 
 function Invoke-DownloadWithRetry {
     param(
@@ -24,6 +77,7 @@ function Invoke-DownloadWithRetry {
         [int]$MaxAttempts = 3
     )
 
+    Write-Host "Downloading '$Uri' to '$OutFile'."
     for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
             Invoke-WebRequest -Uri $Uri -OutFile $OutFile
@@ -37,6 +91,37 @@ function Invoke-DownloadWithRetry {
             Start-Sleep -Seconds (2 * $attempt)
         }
     }
+}
+
+function Ensure-DownloadedAsset {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutFile
+    )
+
+    if (Test-Path -LiteralPath $OutFile) {
+        $existingFile = Get-Item -LiteralPath $OutFile -ErrorAction SilentlyContinue
+        if ($null -ne $existingFile -and $existingFile.Length -gt 0) {
+            Write-Host "$Label already downloaded at '$OutFile'. Skipping download."
+            return $OutFile
+        }
+
+        Write-Host "$Label exists at '$OutFile' but is empty. Re-downloading."
+    }
+
+    $downloadParent = Split-Path -Parent $OutFile
+    if (-not [string]::IsNullOrWhiteSpace($downloadParent)) {
+        New-Item -ItemType Directory -Force -Path $downloadParent | Out-Null
+    }
+
+    Invoke-DownloadWithRetry -Uri $Uri -OutFile $OutFile
+    return $OutFile
 }
 
 function Resolve-InstallerAsset {
@@ -108,19 +193,19 @@ $appArchivePath = Resolve-InstallerAsset -PathOrUrl $AppDownloadUrl -Candidates 
 
 if ($null -eq $appArchivePath) {
     $appArchivePath = Join-Path $DownloadDirectory 'patient-document-manager-app.zip'
-    New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
-    Write-Host "Downloading application payload from $AppDownloadUrl"
     if ([string]::IsNullOrWhiteSpace($AppDownloadUrl)) {
         throw 'No application payload was found locally and no -AppDownloadUrl was supplied. Provide a URL or place patient-document-manager-app.zip in the installer directory or build\installer.'
     }
 
-    Invoke-DownloadWithRetry -Uri $AppDownloadUrl -OutFile $appArchivePath
+    $appArchivePath = Ensure-DownloadedAsset -Label 'Application payload' -Uri $AppDownloadUrl -OutFile $appArchivePath
 }
 elseif ($appArchivePath -match '://') {
     $downloadSource = $appArchivePath
     $appArchivePath = Join-Path $DownloadDirectory 'patient-document-manager-app.zip'
-    New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
-    Invoke-DownloadWithRetry -Uri $downloadSource -OutFile $appArchivePath
+    $appArchivePath = Ensure-DownloadedAsset -Label 'Application payload' -Uri $downloadSource -OutFile $appArchivePath
+}
+else {
+    Write-Host "Using local application payload '$appArchivePath'."
 }
 
 $ghostscriptInstallerPath = Resolve-InstallerAsset -PathOrUrl $GhostscriptDownloadUrl -Candidates @(
@@ -130,9 +215,16 @@ $ghostscriptInstallerPath = Resolve-InstallerAsset -PathOrUrl $GhostscriptDownlo
 )
 
 if ($null -eq $ghostscriptInstallerPath -or $ghostscriptInstallerPath -match '^https?://') {
+    $ghostscriptSource = if ($ghostscriptInstallerPath -match '^https?://') { $ghostscriptInstallerPath } else { $GhostscriptDownloadUrl }
+    if ([string]::IsNullOrWhiteSpace($ghostscriptSource)) {
+        throw 'No Ghostscript installer was found locally and no -GhostscriptDownloadUrl was supplied.'
+    }
+
     $ghostscriptInstallerPath = Join-Path $DownloadDirectory 'ghostscript-installer.exe'
-    New-Item -ItemType Directory -Force -Path $DownloadDirectory | Out-Null
-    Invoke-DownloadWithRetry -Uri $GhostscriptDownloadUrl -OutFile $ghostscriptInstallerPath
+    $ghostscriptInstallerPath = Ensure-DownloadedAsset -Label 'Ghostscript installer' -Uri $ghostscriptSource -OutFile $ghostscriptInstallerPath
+}
+else {
+    Write-Host "Using local Ghostscript installer '$ghostscriptInstallerPath'."
 }
 
 New-Item -ItemType Directory -Force -Path $InstallRoot | Out-Null
@@ -167,6 +259,8 @@ if (-not (Test-Path $launcherPath)) {
     throw "Installed launcher not found: $launcherPath"
 }
 
+$resolvedDriverName = Resolve-PostScriptPrinterDriver -PreferredDriverName $PrinterDriverName
+
 $registerScript = Join-Path $PSScriptRoot 'register-file-processor.ps1'
 $printerScript = Join-Path $PSScriptRoot 'install-patient-document-manager-printer.ps1'
 
@@ -175,7 +269,7 @@ if (-not $?) {
     throw 'Failed to register the PDF handoff integration.'
 }
 
-& $printerScript -LauncherPath $launcherPath -GhostscriptPath $ghostscriptExe.FullName -PrinterName $ProductName
+& $printerScript -LauncherPath $launcherPath -GhostscriptPath $ghostscriptExe.FullName -PrinterName $ProductName -DriverName $resolvedDriverName
 if (-not $?) {
     throw 'Failed to install the Patient Document Manager printer.'
 }

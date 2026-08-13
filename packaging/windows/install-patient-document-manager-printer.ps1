@@ -12,6 +12,60 @@ param(
     [string]$ProgramDataRoot = "$env:ProgramData\PatientDocumentManager"
 )
 
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
+function Resolve-PostScriptPrinterDriver {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PreferredDriverName
+    )
+
+    $driver = Get-PrinterDriver -Name $PreferredDriverName -ErrorAction SilentlyContinue
+    if ($null -ne $driver) {
+        return $driver.Name
+    }
+
+    $addDriverError = $null
+    try {
+        Add-PrinterDriver -Name $PreferredDriverName -ErrorAction Stop | Out-Null
+    }
+    catch {
+        $addDriverError = $_.Exception.Message
+    }
+
+    $driver = Get-PrinterDriver -Name $PreferredDriverName -ErrorAction SilentlyContinue
+    if ($null -ne $driver) {
+        return $driver.Name
+    }
+
+    $fallbackDriver = Get-PrinterDriver -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*PS Class Driver*' } |
+        Sort-Object Name |
+        Select-Object -First 1
+    if ($null -ne $fallbackDriver) {
+        Write-Host "Using fallback PostScript printer driver '$($fallbackDriver.Name)'."
+        return $fallbackDriver.Name
+    }
+
+    $driverErrorDetails = if ([string]::IsNullOrWhiteSpace($addDriverError)) {
+        'Automatic driver installation did not make the driver available.'
+    }
+    else {
+        "Automatic driver installation failed: $addDriverError"
+    }
+
+    throw @"
+No PostScript printer driver is available, so the '$PrinterName' virtual printer cannot be created.
+
+Expected driver: '$PreferredDriverName'
+$driverErrorDetails
+
+Install a Microsoft PostScript class driver in Windows (Print Server Properties > Drivers > Add...),
+then rerun this installer wizard as Administrator.
+"@
+}
+
 $resolvedLauncher = if (Test-Path $LauncherPath) {
     (Resolve-Path $LauncherPath).Path
 } else {
@@ -39,10 +93,7 @@ $taskName = 'PatientDocumentManager Print Watcher'
 New-Item -ItemType Directory -Force -Path $watchDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $archiveDirectory | Out-Null
 
-$driver = Get-PrinterDriver -Name $DriverName -ErrorAction SilentlyContinue
-if ($null -eq $driver) {
-    throw "Required printer driver '$DriverName' is not installed on this machine."
-}
+$resolvedDriverName = Resolve-PostScriptPrinterDriver -PreferredDriverName $DriverName
 
 $existingPort = Get-PrinterPort -Name $portName -ErrorAction SilentlyContinue
 if ($null -eq $existingPort) {
@@ -51,7 +102,7 @@ if ($null -eq $existingPort) {
 
 $existingPrinter = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
 if ($null -eq $existingPrinter) {
-    Add-Printer -Name $PrinterName -DriverName $DriverName -PortName $portName | Out-Null
+    Add-Printer -Name $PrinterName -DriverName $resolvedDriverName -PortName $portName | Out-Null
 }
 
 $watchArguments = @(
